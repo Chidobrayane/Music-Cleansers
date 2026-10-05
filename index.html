@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Music Cleanser</title>
+<meta name="description" content="Music Cleanser finds and censors foul words in songs, right in your browser. Nothing is uploaded.">
+<meta name="theme-color" content="#0c0e11">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect width='26' height='26' rx='6' fill='%230c0e11'/%3E%3Cpath d='M5 11v4M9 9v8M13 6v14M17 9v8M21 11v4' stroke='%23ff8a3d' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"></noscript>
+<style>
+@font-face{font-family:'Plex Fallback';src:local('Arial'),local('Helvetica Neue'),local('Roboto');size-adjust:103%;ascent-override:102%;descent-override:27%;line-gap-override:0%}   /* matches the fallback font to IBM Plex Sans so the text does not jump when the real font arrives */
+:root{
+  --bg:#0c0e11;--panel:#15181c;--panel-2:#1a1e23;--line:#262b31;
+  --tx:#eef1f4;--mut:#828b98;
+  --acc:#ff8a3d;--acc-ink:#26150a;
+  --ok:#3ddc8a;--bad:#ff4d5e;
+  --sans:'IBM Plex Sans','Plex Fallback',system-ui,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+  --r:999px;--rs:8px;--rl:14px;--t:160ms cubic-bezier(.4,0,.2,1)
+}
+*{box-sizing:border-box}
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+button,select,input,label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--tx);font:15px/1.4 var(--sans);display:flex;flex-direction:column;
+  background-image:radial-gradient(circle at 50% 0%,#1a1e24 0%,var(--bg) 55%)}
+button,select,input{font:14px var(--sans);color:var(--tx);background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r);padding:11px 18px;cursor:pointer;transition:border-color var(--t),background var(--t),transform 80ms}
+button{display:inline-flex;align-items:center;gap:9px}
+input[type=range]{background:transparent;border:0;padding:0;border-radius:0;cursor:pointer}
+input[type=number],input[type=text]{cursor:text}
+button:hover{border-color:#3a4148;background:var(--panel-2)}
+button:active{transform:scale(.97)}
+button.on,button.pri{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
+button.on:hover,button.pri:hover{background:#ff9c5c;border-color:#ff9c5c}
+button:disabled{opacity:.45;cursor:default;transform:none}
+button:focus-visible,select:focus-visible,input:focus-visible,.w:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.ic{width:17px;height:17px;flex:none}
+header,footer{display:flex;gap:12px;align-items:center;padding:14px 20px;background:#101317;border-color:var(--line);flex-wrap:wrap}
+header{border-bottom:1px solid var(--line)}footer{border-top:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:9px;margin:0 6px 0 0}
+.logo .ic{width:26px;height:26px}
+.logo b{font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--tx)}
+.logo b .lw2{color:var(--acc)}
+.logo b i{display:inline-block;font-style:normal;will-change:transform;animation:lin .7s cubic-bezier(.2,.7,.2,1) calc(var(--i) * 45ms) backwards,lwave 2.8s ease-in-out calc(.8s + var(--i) * 95ms) infinite}
+.logo b .lw2 i{animation:lin .7s cubic-bezier(.2,.7,.2,1) calc(var(--i) * 45ms) backwards,lwave 2.8s ease-in-out calc(.8s + var(--i) * 95ms) infinite,lglow 2.8s ease-in-out calc(.8s + var(--i) * 95ms) infinite}
+.lb{transform-box:fill-box;transform-origin:center;animation:lbar 1.15s ease-in-out var(--d) infinite alternate;will-change:transform}
+body.busy .lb,body.playing .lb{animation-duration:.5s}
+body.busy .logo b i,body.playing .logo b i{animation-duration:.7s,1.5s,1.5s}
+@keyframes lbar{from{transform:scaleY(.3)}to{transform:scaleY(1.12)}}
+@keyframes lwave{0%,55%,100%{transform:translateY(0)}27%{transform:translateY(-3px)}}
+@keyframes lin{from{transform:translateY(9px) scale(.9)}to{transform:none}}
+@keyframes lglow{0%,55%,100%{color:var(--acc)}27%{color:#ffc79a}}
+.selwrap{position:relative;display:inline-flex;align-items:center}
+.selwrap .ic{position:absolute;left:14px;pointer-events:none;color:var(--mut)}
+.selwrap select{padding-left:38px;padding-right:32px;appearance:none;-webkit-appearance:none;background-image:none}
+.selwrap .chev{position:absolute;right:12px;pointer-events:none;color:var(--mut);width:14px;height:14px}
+.seg{display:flex;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:3px}
+.seg button{border:0;border-radius:var(--r);background:transparent;position:relative;z-index:1;padding:8px 16px}
+.seg button:hover{background:transparent;color:var(--tx)}
+.seg button.on{background:transparent;color:var(--acc-ink)}
+.seg-hl{position:absolute;top:3px;bottom:3px;border-radius:var(--r);background:var(--acc);
+  transition:transform var(--t),width var(--t);will-change:transform}
+main{flex:1;display:flex;min-height:0}
+aside{width:270px;border-right:1px solid var(--line);overflow:auto;padding:12px;flex:none}
+aside .hint{display:flex;gap:10px;padding:4px 2px}
+aside .hint .ic{color:var(--acc);flex:none;margin-top:1px}
+aside .hint b{display:block;color:var(--tx);font-size:14px;margin-bottom:4px}
+.f{padding:10px 10px 10px 13px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:var(--rs);
+  margin-bottom:8px;background:var(--panel);cursor:pointer;overflow-wrap:anywhere;transition:border-color var(--t),background var(--t)}
+.f:hover{background:var(--panel-2)}
+.f.sel{border-left-color:var(--acc);background:var(--panel-2)}
+.f small{display:flex;align-items:center;gap:6px;color:var(--mut);margin-top:4px;font:12px var(--mono)}
+.f small::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--mut);flex:none}
+.f.st-working small::before{background:var(--acc);animation:pulse 1.1s ease-in-out infinite}
+.f.st-ready small::before{background:var(--ok)}
+.f.st-error small::before{background:var(--bad)}
+section{flex:1;padding:18px 20px;overflow:auto;min-width:0}
+canvas{width:100%;height:130px;background:var(--panel);border:1px solid var(--line);border-radius:var(--rl);display:block;cursor:pointer;transition:border-color var(--t)}
+canvas.busy{border-color:rgba(255,138,61,.5);animation:glow 1.6s ease-in-out infinite}
+canvas.hide{display:none}
+canvas{touch-action:pan-y;user-select:none}
+.hide{display:none!important}
+#drop{height:220px;border:2px dashed var(--line);border-radius:var(--rl);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;cursor:pointer;color:var(--mut);transition:border-color var(--t),background var(--t)}
+#drop:hover,#drop.over{border-color:var(--acc);background:rgba(255,138,61,.05)}
+#drop .ic{width:36px;height:36px;color:var(--acc);margin-bottom:4px}
+#drop b{color:var(--tx);font-size:16px;font-weight:600}
+#drop span{font-size:13px}
+#drop.hide{display:none}
+.bar{display:flex;gap:14px;align-items:center;margin:14px 0;color:var(--mut);flex-wrap:wrap;font:13px var(--sans)}
+#time{font:13px var(--mono);color:var(--tx);min-width:88px}
+.bar label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);
+  border-radius:var(--r);padding:8px 16px 8px 14px}
+#pad{width:36px;padding:0;border:0;background:transparent;font:13px var(--mono);text-align:right}
+#gain{width:120px;vertical-align:middle;accent-color:var(--acc)}
+#gainv{color:var(--tx);display:inline-block;width:36px;font:13px var(--mono)}
+#count{font:13px var(--mono)}
+#thorough{width:16px;height:16px;padding:0;border-radius:4px;accent-color:var(--acc)}
+#play{width:46px;height:46px;padding:0;border-radius:50%;justify-content:center;background:var(--acc);
+  color:var(--acc-ink);border-color:var(--acc)}
+#play:hover{background:#ff9c5c;border-color:#ff9c5c}
+#play .ic{width:19px;height:19px}
+#tx{line-height:2.4;font-size:16px}
+.w{padding:3px 6px;border-radius:5px;cursor:pointer;margin:0 1px;transition:background var(--t),color var(--t)}
+.w:hover{background:var(--line)}
+.w.bad{background:var(--bad);color:#fff;font-weight:600;animation:flag .22s ease-out}
+.hint{color:var(--mut);font-size:13px;display:flex;gap:9px;align-items:flex-start;margin:14px 0}
+.hint .ic{flex:none;margin-top:1px}
+.hint span{display:block}
+#status{flex:1;color:var(--mut);min-width:200px;display:flex;align-items:center;gap:9px;font:13px var(--mono)}
+#status::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--mut);flex:none;transition:background var(--t)}
+#status.busy::before{background:var(--acc);animation:pulse 1.1s ease-in-out infinite}
+#status.err::before{background:var(--bad)}
+dialog{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:var(--rl);width:420px;max-width:92vw;
+  padding:18px;animation:pop var(--t) cubic-bezier(.2,.9,.3,1.2)}
+dialog::backdrop{background:rgba(4,5,7,.7)}
+textarea{width:100%;height:320px;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:var(--rs);padding:10px;font:13px var(--mono)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes flag{0%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes pop{from{opacity:0;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(255,138,61,0)}50%{box-shadow:0 0 0 3px rgba(255,138,61,.12)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}.lb,.logo b i{animation:none!important}}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,select{font-weight:500;letter-spacing:.005em}
+#time,#count,#gainv,#pad{font-variant-numeric:tabular-nums}
+#flow{margin:14px 0;padding:18px 20px 14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--rl)}
+#flow.hide{display:none}
+#flowsteps{list-style:none;margin:0;padding:0;display:flex}
+#flowsteps li{flex:1;position:relative;text-align:center;font-size:12.5px;font-weight:500;letter-spacing:.01em;color:var(--mut);transition:color var(--t)}
+#flowsteps li::before{content:'';display:block;width:12px;height:12px;border-radius:50%;margin:0 auto 9px;background:var(--panel-2);border:2px solid var(--line);position:relative;z-index:1;transition:background var(--t),border-color var(--t)}
+#flowsteps li::after{content:'';position:absolute;top:6px;left:calc(50% + 11px);right:calc(-50% + 11px);height:2px;background:var(--line);transition:background var(--t)}
+#flowsteps li:last-child::after{display:none}
+#flowsteps li.done{color:var(--tx)}
+#flowsteps li.done::before{background:var(--ok);border-color:var(--ok)}
+#flowsteps li.done::after{background:var(--ok)}
+#flowsteps li.now{color:var(--acc)}
+#flowsteps li.now::before{background:var(--acc);border-color:var(--acc);animation:pulse 1.1s ease-in-out infinite}
+#flow.err #flowsteps li.now{color:var(--bad)}
+#flow.err #flowsteps li.now::before{background:var(--bad);border-color:var(--bad);animation:none}
+#flowbar{height:4px;background:var(--line);border-radius:4px;margin:14px 0 9px;overflow:hidden}
+#flowbar i{display:block;height:100%;width:0;background:var(--acc);border-radius:4px;transition:width .3s ease}
+#flow.err #flowbar i{background:var(--bad)}
+#flowtxt{font:12.5px var(--mono);color:var(--mut);overflow-wrap:anywhere}
+@media (max-width:800px){#flowsteps li{font-size:10.5px}}
+main{position:relative}
+aside{position:relative;z-index:1}
+#eq{position:absolute;left:0;bottom:0;width:270px;height:150px;display:flex;align-items:flex-end;gap:6px;padding:0 16px 0 12px;
+  pointer-events:none;z-index:0;opacity:.55;transition:opacity .4s;
+  -webkit-mask-image:linear-gradient(90deg,#000 25%,transparent 100%);mask-image:linear-gradient(90deg,#000 25%,transparent 100%)}
+#eq i{flex:1;max-width:9px;height:var(--h);border-radius:3px 3px 0 0;transform-origin:bottom;will-change:transform;
+  background:linear-gradient(to top,rgba(255,138,61,.08),rgba(255,138,61,.9));
+  animation:eq var(--d) ease-in-out var(--o) infinite alternate}
+body.busy #eq,body.playing #eq{opacity:1}
+body.busy #eq i{animation-duration:calc(var(--d) * .55)}
+body.playing #eq i{animation-duration:calc(var(--d) * .4)}
+@keyframes eq{from{transform:scaleY(.18)}to{transform:scaleY(1)}}
+@media (max-width:800px){#eq{display:none}}
+@media (prefers-reduced-motion:reduce){#eq i{animation:none!important;transform:scaleY(.6)}}
+#drop em{font-style:normal}.to{display:none}
+@media (pointer:coarse){.mo{display:none}.to{display:inline}button,select,.seg button{min-height:44px}input,select{font-size:16px}}
+header,footer{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+@media (max-width:800px){
+  header,footer{padding-top:10px;padding-bottom:10px;gap:8px}
+  .logo{width:100%}
+  header .seg,header select{max-width:100%}
+  #flowsteps li{min-width:0;overflow-wrap:anywhere}
+  main{flex-direction:column}
+  aside{width:auto;max-height:170px;border-right:0;border-bottom:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg class="ic" viewBox="0 0 26 26" fill="none" stroke="#ff8a3d" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path class="lb" style="--d:-.1s" d="M3 10v6"/><path class="lb" style="--d:-.5s" d="M8 8v10"/><path class="lb" style="--d:-.9s" d="M13 4v18"/><path class="lb" style="--d:-.3s" d="M18 8v10"/><path class="lb" style="--d:-.7s" d="M23 10v6"/></svg>
+    <b aria-label="Music Cleanser"><span class="lw" aria-hidden="true"><i style="--i:0">M</i><i style="--i:1">u</i><i style="--i:2">s</i><i style="--i:3">i</i><i style="--i:4">c</i></span> <span class="lw lw2" aria-hidden="true"><i style="--i:5">C</i><i style="--i:6">l</i><i style="--i:7">e</i><i style="--i:8">a</i><i style="--i:9">n</i><i style="--i:10">s</i><i style="--i:11">e</i><i style="--i:12">r</i></span></b>
+  </div>
+  <button id="add" class="pri"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>Add audio</button>
+  <button id="auto" class="on" title="Finds and censors the foul words by itself, then saves the finished file. Turn off to review the words first."><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2 4 11h5l-1 7 7-9h-5l1-7z"/></svg>Auto censor</button>
+  <input id="picker" type="file" multiple hidden>
+  <input id="clipPicker" type="file" hidden>
+  <div class="seg" id="modes"><span class="seg-hl" id="segHl"></span>
+    <button data-m="beep" class="on"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 13V7M10 15V5M15 13V7"/></svg>Beep</button>
+    <button data-m="silent"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l4-4v14l-4-4H3V7z"/><path d="M14 6l4 8M18 6l-4 8"/></svg>Silent</button>
+    <button data-m="hi"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10h2l1.5-4L9 15l2.5-11L13 10h2"/></svg>Hi</button>
+  </div>
+  <button id="clip" title="Choose your own 'hi' sound file, or keep the default high tone"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10h2l1.5-4L9 15l2.5-11L13 10h2"/></svg>Hi sound: high tone</button>
+  <button id="wl"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h6l4 4v12H6V2z"/><path d="M12 2v4h4M8 11h6M8 14h6M8 8h3"/></svg>Word list</button>
+  <div class="selwrap">
+    <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="8" height="8" rx="1.2"/><path d="M9 2v3M12 2v3M9 16v3M12 16v3M2 9h3M2 12h3M16 9h3M16 12h3"/></svg>
+    <select id="model" title="Auto = Base model with extra scans running side by side. Careful uses the Small model: most accurate, but slower.">
+      <option value="auto">Model: Auto (balanced)</option>
+      <option value="Xenova/whisper-base">Model: Base (fast)</option>
+      <option value="Xenova/whisper-small">Model: Careful (Small, slower)</option>
+      <option value="team" selected title="Base + Small + Wav2Vec2 listen together and their results are joined">Model: Team (3 models, best)</option>
+      <option value="Xenova/whisper-tiny">Model: Tiny (fastest)</option>
+    </select>
+    <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+  </div>
+  <div class="selwrap">
+    <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="10" r="7.3"/><path d="M2.7 10h14.6M10 2.7c2.6 2 2.6 12.6 0 14.6M10 2.7c-2.6 2-2.6 12.6 0 14.6"/></svg>
+    <select id="lang"><option value="english" selected>Language: English / Pidgin</option><option value="auto">Language: Auto-detect</option><option value="afrikaans">Afrikaans</option><option value="albanian">Albanian</option><option value="amharic">Amharic</option><option value="arabic">Arabic</option><option value="armenian">Armenian</option><option value="assamese">Assamese</option><option value="azerbaijani">Azerbaijani</option><option value="bashkir">Bashkir</option><option value="basque">Basque</option><option value="belarusian">Belarusian</option><option value="bengali">Bengali</option><option value="bosnian">Bosnian</option><option value="breton">Breton</option><option value="bulgarian">Bulgarian</option><option value="catalan">Catalan</option><option value="chinese">Chinese</option><option value="croatian">Croatian</option><option value="czech">Czech</option><option value="danish">Danish</option><option value="dutch">Dutch</option><option value="estonian">Estonian</option><option value="faroese">Faroese</option><option value="finnish">Finnish</option><option value="french">French</option><option value="galician">Galician</option><option value="georgian">Georgian</option><option value="german">German</option><option value="greek">Greek</option><option value="gujarati">Gujarati</option><option value="haitian creole">Haitian Creole</option><option value="hausa">Hausa</option><option value="hawaiian">Hawaiian</option><option value="hebrew">Hebrew</option><option value="hindi">Hindi</option><option value="hungarian">Hungarian</option><option value="icelandic">Icelandic</option><option value="indonesian">Indonesian</option><option value="italian">Italian</option><option value="japanese">Japanese</option><option value="javanese">Javanese</option><option value="kannada">Kannada</option><option value="kazakh">Kazakh</option><option value="khmer">Khmer</option><option value="korean">Korean</option><option value="lao">Lao</option><option value="latin">Latin</option><option value="latvian">Latvian</option><option value="lingala">Lingala</option><option value="lithuanian">Lithuanian</option><option value="luxembourgish">Luxembourgish</option><option value="macedonian">Macedonian</option><option value="malagasy">Malagasy</option><option value="malay">Malay</option><option value="malayalam">Malayalam</option><option value="maltese">Maltese</option><option value="maori">Maori</option><option value="marathi">Marathi</option><option value="mongolian">Mongolian</option><option value="myanmar">Myanmar</option><option value="nepali">Nepali</option><option value="norwegian">Norwegian</option><option value="nynorsk">Nynorsk</option><option value="occitan">Occitan</option><option value="pashto">Pashto</option><option value="persian">Persian</option><option value="polish">Polish</option><option value="portuguese">Portuguese</option><option value="punjabi">Punjabi</option><option value="romanian">Romanian</option><option value="russian">Russian</option><option value="sanskrit">Sanskrit</option><option value="serbian">Serbian</option><option value="shona">Shona</option><option value="sindhi">Sindhi</option><option value="sinhala">Sinhala</option><option value="slovak">Slovak</option><option value="slovenian">Slovenian</option><option value="somali">Somali</option><option value="spanish">Spanish</option><option value="sundanese">Sundanese</option><option value="swahili">Swahili</option><option value="swedish">Swedish</option><option value="tagalog">Tagalog</option><option value="tajik">Tajik</option><option value="tamil">Tamil</option><option value="tatar">Tatar</option><option value="telugu">Telugu</option><option value="thai">Thai</option><option value="tibetan">Tibetan</option><option value="turkish">Turkish</option><option value="turkmen">Turkmen</option><option value="ukrainian">Ukrainian</option><option value="urdu">Urdu</option><option value="uzbek">Uzbek</option><option value="vietnamese">Vietnamese</option><option value="welsh">Welsh</option><option value="yiddish">Yiddish</option><option value="yoruba">Yoruba</option></select>
+    <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+  </div>
+</header>
+<main>
+  <aside id="files"><p class="hint">
+    <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.3v5"/><circle cx="10" cy="6.4" r=".9" fill="currentColor" stroke="none"/></svg>
+    <span><b>Add audio files</b>They're transcribed one by one, in your browser. Nothing is uploaded.</span>
+  </p></aside>
+  <div id="eq" aria-hidden="true"><i style="--h:34%;--d:1.1s;--o:0s"></i><i style="--h:58%;--d:0.9s;--o:-0.3s"></i><i style="--h:42%;--d:1.4s;--o:-0.7s"></i><i style="--h:80%;--d:0.8s;--o:-0.2s"></i><i style="--h:66%;--d:1.2s;--o:-0.9s"></i><i style="--h:50%;--d:1.0s;--o:-0.5s"></i><i style="--h:92%;--d:1.5s;--o:-1.1s"></i><i style="--h:70%;--d:0.85s;--o:-0.4s"></i><i style="--h:46%;--d:1.3s;--o:-0.8s"></i><i style="--h:60%;--d:1.05s;--o:-0.1s"></i><i style="--h:38%;--d:0.95s;--o:-0.6s"></i><i style="--h:54%;--d:1.25s;--o:-1.0s"></i><i style="--h:30%;--d:1.15s;--o:-0.35s"></i><i style="--h:44%;--d:0.9s;--o:-0.75s"></i><i style="--h:26%;--d:1.35s;--o:-0.15s"></i><i style="--h:36%;--d:1.0s;--o:-0.55s"></i><i style="--h:22%;--d:1.2s;--o:-0.95s"></i><i style="--h:30%;--d:0.8s;--o:-0.25s"></i><i style="--h:18%;--d:1.1s;--o:-0.65s"></i><i style="--h:24%;--d:1.3s;--o:-0.45s"></i><i style="--h:14%;--d:0.95s;--o:-0.85s"></i><i style="--h:18%;--d:1.05s;--o:-0.05s"></i></div>
+  <section>
+    <canvas id="wave" class="hide"></canvas>
+    <div id="drop">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 18H7a4.2 4.2 0 0 1-.7-8.34A5.5 5.5 0 0 1 17 9.5a3.7 3.7 0 0 1-.5 8.5z"/><path d="M12 12.5v6.5M9.3 15.2 12 12.5l2.7 2.7"/></svg>
+      <b><em class="mo">Drop your audio files here</em><em class="to">Add your audio files</em></b>
+      <span id="dropsub"><em class="mo">or click to browse</em><em class="to">Tap here, then choose your song from Files</em></span>
+    </div>
+    <div id="flow" class="hide"><ol id="flowsteps"></ol><div id="flowbar"><i></i></div><div id="flowtxt"></div></div>
+    <div class="bar">
+      <button id="play"><svg class="ic" id="playIc" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M6 4l10 6-10 6V4z"/></svg></button>
+      <span id="time">0:00 / 0:00</span>
+      <label>Padding (ms) <input id="pad" type="number" value="100" min="0" max="500"></label>
+      <label>Beep/Hi volume <input id="gain" type="range" min="0" max="100" value="10"><span id="gainv">10%</span></label>
+      <label title="Also listens in short 8-second clips. The model skips lyrics over loud music when it listens in long windows, so this catches many more words. Takes longer."><input type="checkbox" id="thorough" checked>Deep scan</label>
+      <span id="count"></span>
+      <span id="rangebox" class="hide"><button id="rangeadd" class="pri"></button> <button id="rangescan" title="Listens again to this section in very short clips and adds any words it finds">Re-scan here</button> <button id="rangecancel">Cancel</button></span>
+      <button id="rangeclear" class="hide" title="Removes every censored range on this song (flagged words stay)">Remove ranges</button>
+    </div>
+    <p class="hint">
+      <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7.3"/><path d="M10 9.3v5"/><circle cx="10" cy="6.4" r=".9" fill="currentColor" stroke="none"/></svg>
+      <span>Red words will be censored. Click a word to flag or unflag it. Double-click a word to hear it. Click the waveform to seek. Drag across the waveform to select a section, then press Censor to beep all of it, or Re-scan here to listen again. Yellow marks under the waveform show stretches where few words were heard.</span>
+    </p>
+    <div id="tx"></div>
+  </section>
+</main>
+<footer>
+  <span id="status" role="status" aria-live="polite">Ready.</span>
+  <button id="dir"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5.8c0-.7.6-1.3 1.3-1.3h4l1.5 2h7.2c.7 0 1.3.6 1.3 1.3v7.1c0 .7-.6 1.3-1.3 1.3H3.8c-.7 0-1.3-.6-1.3-1.3V5.8z"/></svg>Output: downloads folder</button>
+  <div class="selwrap">
+    <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 17v-6M5 7V3M10 17v-3M10 10V3M15 17v-4M15 9V3"/><circle cx="5" cy="9.5" r="1.4" fill="var(--panel)"/><circle cx="10" cy="12.5" r="1.4" fill="var(--panel)"/><circle cx="15" cy="10.5" r="1.4" fill="var(--panel)"/></svg>
+    <select id="fmt"><option value="same">Format: same as source</option><option value="mp3">MP3</option><option value="wav">WAV</option></select>
+    <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+  </div>
+  <button id="exp" class="pri"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M4 15.5h12"/></svg>Export this file</button>
+  <button id="expAll" class="pri"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 3.5 6.5 10 10.5l6.5-4-6.5-4z"/><path d="M3.5 10 10 14l6.5-4M3.5 13.5 10 17.5l6.5-4"/></svg>Export all</button>
+</footer>
+<dialog id="wlg">
+  <p><b>Word list</b><br><span class="hint">One word per line. End with * to catch variants (fuck* catches fucking, fucked...).</span></p>
+  <textarea id="wlt"></textarea>
+  <p style="text-align:right"><button id="wld" title="Adds any default words you do not have yet. Nothing is removed.">Add default words</button> <button id="wlc">Cancel</button> <button id="wls" class="pri">Save &amp; re-scan</button></p>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js" defer></script>   <!-- only needed when exporting MP3, so it must not block the page -->
+<script>
+document.querySelectorAll('link[rel="preload"][as="style"]').forEach(l => { l.rel = 'stylesheet'; });   // fonts load without blocking the first paint
+/* ---------- default word list (from words.json) ---------- */
+const DEFAULT_WORDS = ["fuck*", "fucking", "shit*", "bullshit", "bitch*", "asshole*", "bastard*", "dick", "dickhead", "pussy", "cunt*", "whore*", "slut*", "motherfucker*", "wanker*", "prick", "bollocks", "piss", "crap", "damn", "goddamn", "nigga*", "nigger*", "retard*", "ashawo", "ashewo", "oloshi", "olosho", "agbaya", "oloriburuku", "olofofo", "mumu", "yeye", "karuwa", "banza", "kwaila", "arsehole*", "cock", "cocks", "cocksucker*", "jackass", "douche*", "twat*", "tosser", "bugger", "asshole", "ass", "hoe", "hoes", "dicks", "pussies", "olodo", "mugu", "shege", "iska"];
+const WORDS_KEY = 'cleancut.words';
+const getWords = () => { try { const v = JSON.parse(localStorage.getItem(WORDS_KEY)); if (Array.isArray(v)) return v; } catch (_) {} return DEFAULT_WORDS.slice(); };
+const setWords = list => { try { localStorage.setItem(WORDS_KEY, JSON.stringify(list)); } catch (_) {} };
+
+/* ---------- speech recognition worker (Whisper via transformers.js) ---------- */
+const TF_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+function workerMain() {
+  let T, asr, key;
+  const status = m => postMessage({ t: 'status', m });
+  let chain = Promise.resolve();
+  onmessage = e => { chain = chain.then(() => run(e.data)); };
+  const run = async d => {
+    try {
+      if (!T) T = await import(TF_URL);
+      if (!asr || key !== d.model) {
+        try { if (asr && asr.dispose) await asr.dispose(); } catch (_) {} asr = null;
+        status(`Loading ${d.model} (first run downloads it once, then your browser keeps it)...`);
+        asr = await T.pipeline('automatic-speech-recognition', d.model, {
+          progress_callback: p => { if (p.status === 'progress') status(`Downloading model: ${Math.round(p.progress)}%`); }
+        });
+        key = d.model;
+      }
+      const ctc = /wav2vec2/i.test(d.model);
+      const opts = ctc ? { return_timestamps: 'word', chunk_length_s: 20, stride_length_s: 3 } : { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5, task: 'transcribe' };
+      if (!ctc && d.language && d.language !== 'auto') opts.language = d.language;
+      const o = await asr(d.audio, opts);
+      postMessage({ t: 'done', id: d.id, chunks: (o.chunks || []).map(c => ({ text: c.text, ts: c.timestamp })) });
+    } catch (err) {
+      postMessage({ t: 'error', id: d.id, m: String((err && err.message) || err) });
+    }
+  };
+}
+let jobId = 0, useMain = false; const jobs = new Map(), pool = [];
+const IS_PHONE = matchMedia('(pointer:coarse)').matches || !!(navigator.deviceMemory && navigator.deviceMemory <= 4);   // phones: less memory, so fewer workers
+const POOL_MAX = IS_PHONE ? Math.max(1, Math.min(2, Math.floor((navigator.hardwareConcurrency || 4) / 4))) : Math.max(1, Math.min(3, Math.floor((navigator.hardwareConcurrency || 4) / 2)));   // scans run side by side on separate workers
+function spawn() {
+  const src = `const TF_URL=${JSON.stringify(TF_URL)};(${workerMain.toString()})()`;
+  const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));   // classic worker: also starts when the page is opened from a file
+  w.busy = 0;
+  w.onmessage = e => {
+    const d = e.data;
+    if (d.t === 'status') return setStatus(d.m);
+    const j = jobs.get(d.id); if (!j) return; jobs.delete(d.id); j.w.busy--;
+    d.t === 'done' ? j.res(d.chunks) : j.rej(new Error(d.m));
+  };
+  w.onerror = e => {
+    const m = e.message || 'Speech engine failed to start';
+    jobs.forEach((j, id) => { if (j.w === w) { jobs.delete(id); j.rej(new Error(m)); } });
+    const k = pool.indexOf(w); if (k >= 0) pool.splice(k, 1);
+    if (!pool.length) useMain = true;
+  };
+  pool.push(w); return w;
+}
+let teamCap = 0;   // 3 while a Team scan runs, so each of its models gets its own worker
+function pickWorker(model) {
+  const cap = Math.max(POOL_MAX, teamCap), least = (b, x) => (!b || x.busy < b.busy ? x : b);
+  let w = pool.filter(x => !x.model || x.model === model).reduce(least, null);        // prefer a worker that already holds this model
+  if (!w || (w.busy > 0 && pool.length < cap)) w = pool.length < cap ? spawn() : (w || pool.reduce(least, null));
+  return w;
+}
+// Fallback: if the browser blocks background workers (for example inside a sandboxed preview),
+// run the same Whisper model on the main page instead. Slower, but it still works.
+let mainT, mainAsr, mainKey;
+let mainLock = Promise.resolve();
+function transcribeMain(audio, model, language) { const run = mainLock.then(() => transcribeMainRun(audio, model, language)); mainLock = run.catch(() => {}); return run; }
+async function transcribeMainRun(audio, model, language) {
+  try {
+    if (!mainT) {
+      mainT = await import(TF_URL);
+      try { mainT.env.backends.onnx.wasm.proxy = false; mainT.env.backends.onnx.wasm.numThreads = 1; } catch (_) {}
+    }
+    if (!mainAsr || mainKey !== model) {
+      setStatus(`Loading ${model} (first run downloads it once, then your browser keeps it)...`);
+      mainAsr = await mainT.pipeline('automatic-speech-recognition', model, {
+        progress_callback: p => { if (p.status === 'progress') setStatus(`Downloading model: ${Math.round(p.progress)}%`); }
+      });
+      mainKey = model;
+    }
+    setStatus('Transcribing (background workers are blocked here, so this may take longer)...');
+    const ctc = /wav2vec2/i.test(model);
+    const opts = ctc ? { return_timestamps: 'word', chunk_length_s: 20, stride_length_s: 3 } : { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5, task: 'transcribe' };
+    if (!ctc && language && language !== 'auto') opts.language = language;
+    const o = await mainAsr(audio, opts);
+    return (o.chunks || []).map(c => ({ text: c.text, ts: c.timestamp }));
+  } catch (err) {
+    throw new Error('Speech engine could not start in this window (' + String((err && err.message) || err) + '). Download this file and open it in Chrome or Edge, or host it on your own site.');
+  }
+}
+const transcribe = (audio, model, language) => {
+  let w = null;
+  if (!useMain) { try { w = pickWorker(model); } catch (e) { console.warn('Background worker blocked, using main-thread fallback:', e); useMain = true; } }
+  if (!w) return transcribeMain(audio, model, language);
+  return new Promise((res, rej) => {
+    const id = ++jobId; w.busy++; w.model = model; jobs.set(id, { res, rej, w });
+    w.postMessage({ id, audio, model, language }, [audio.buffer]);
+  });
+};
+
+
+/* ---------- audio helpers ---------- */
+const $ = s => document.querySelector(s);
+function setStatus(m) {
+  const el = $('#status'); el.textContent = m;
+  const err = /error|failed/i.test(m), idle = /^(ready\.?|done\.?)$/i.test(m) || /^saved /i.test(m);
+  el.classList.toggle('err', err); el.classList.toggle('busy', !err && !idle);
+  $('#wave').classList.toggle('busy', !err && !idle);
+  document.body.classList.toggle('busy', !err && !idle);
+}
+let actx;
+const decode = async file => { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); return actx.decodeAudioData(await file.arrayBuffer()); };
+async function resample(buf, ch, rate) {
+  const off = new OfflineAudioContext(ch, Math.max(1, Math.ceil(buf.duration * rate)), rate);
+  const s = off.createBufferSource(); s.buffer = buf; s.connect(off.destination); s.start();
+  return off.startRendering();
+}
+
+/* ---------- streaming audio readers (no length limit) ---------- */
+const MB_URL = 'https://cdn.jsdelivr.net/npm/mediabunny@1/+esm';
+let MB;
+/* PURE-START */
+function merge(segs, maxT = Infinity) {
+  const a = segs.map(([s, e]) => [Math.max(0, s), Math.min(maxT, Math.max(0, e))]).filter(([s, e]) => e > s).sort((x, y) => x[0] - y[0]);
+  const o = [];
+  for (const s of a) {
+    const l = o[o.length - 1];
+    if (l && s[0] <= l[1] + 0.02) l[1] = Math.max(l[1], s[1]); else o.push([s[0], s[1]]);
+  }
+  return o;
+}
+const i16 = x => { const v = Math.max(-1, Math.min(1, x)); return v < 0 ? v * 32768 : v * 32767; };
+
+// Take source samples (L,R at srcRate, first sample at time srcStart) and return exactly [t0,t1) at `rate`.
+async function sliceAndResample(L, R, srcRate, srcStart, t0, t1, rate) {
+  let oL = L, oR = R;
+  if (srcRate !== rate) {
+    const ab = new AudioBuffer({ length: L.length, numberOfChannels: 2, sampleRate: srcRate });
+    ab.copyToChannel(L, 0); ab.copyToChannel(R, 1);
+    const r = await resample(ab, 2, rate);
+    oL = r.getChannelData(0); oR = r.getChannelData(1);
+  }
+  const n = Math.round((t1 - t0) * rate), st = Math.round((t0 - srcStart) * rate);
+  const outL = new Float32Array(n), outR = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const j = st + i; if (j >= 0 && j < oL.length) { outL[i] = oL[j]; outR[i] = oR[j]; } }
+  return { L: outL, R: outR };
+}
+
+function makeSegs(segsIn, dur, SR, N) {
+  return merge(segsIn, dur).map(([s, e]) => { const i0 = Math.floor(s * SR); return { i0, n: Math.min(N, Math.ceil(e * SR)) - i0 }; }).filter(x => x.n > 0);
+}
+// c0 = global index of L[0]; segments are in global sample coordinates so seams between chunks are seamless.
+function applyCensor(L, R, c0, segs, mode, cl, gain, SR) {
+  const c1 = c0 + L.length, freq = mode === 'hi' ? 2000 : 1000;
+  for (const { i0, n } of segs) {
+    const lo = Math.max(i0, c0), hi = Math.min(i0 + n, c1);
+    if (hi <= lo) continue;
+    const fade = Math.min(Math.round(0.01 * SR), Math.floor(n / 2)) || 1;
+    for (let g = lo; g < hi; g++) {
+      const k = g - i0; let vl = 0, vr = 0;
+      if (mode !== 'silent') {
+        const env = Math.min(1, k / fade, (n - 1 - k) / fade);
+        if (cl) { if (k < cl[0].length) { vl = cl[0][k] * gain * env; vr = cl[1][k] * gain * env; } }
+        else vl = vr = Math.sin(2 * Math.PI * freq * k / SR) * gain * env;
+      }
+      L[g - c0] = vl; R[g - c0] = vr;
+    }
+  }
+}
+async function runExport(rd, N, SR, segs, mode, cl, gain, sink, progress, CH = 60 * SR) {
+  for (let c0 = 0; c0 < N; c0 += CH) {
+    const c1 = Math.min(N, c0 + CH);
+    const { L, R } = await rd.read(c0 / SR, c1 / SR, SR);
+    applyCensor(L, R, c0, segs, mode, cl, gain, SR);
+    await sink.write(L, R);
+    if (progress) progress(c1 / N);
+    await new Promise(z => setTimeout(z));
+  }
+}
+function wavHeader(N, SR) {
+  if (N * 4 + 36 > 0xFFFFFFFF) throw new Error('WAV cannot hold more than about 6 hours. Choose MP3 for this file.');
+  const b = new ArrayBuffer(44), v = new DataView(b);
+  const w = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + N * 4, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, N * 4, true);
+  return new Uint8Array(b);
+}
+/* PURE-END */
+
+// Streaming reader: decodes only the part asked for, so memory stays small however long the file is.
+async function streamReader(file) {
+  MB = MB || await import(MB_URL);
+  const input = new MB.Input({ source: new MB.BlobSource(file), formats: MB.ALL_FORMATS });
+  const track = await input.getPrimaryAudioTrack();
+  if (!track) throw new Error('no audio track');
+  if (!(await track.canDecode())) throw new Error('codec not supported by this browser');
+  const duration = await input.computeDuration();
+  if (!isFinite(duration) || duration <= 0) throw new Error('unknown duration');
+  const sink = new MB.AudioBufferSink(track);
+  return {
+    kind: 'stream', duration,
+    async read(t0, t1, rate) {
+      const m = 0.25, a = Math.max(0, t0 - m), b = Math.min(duration, t1 + m);
+      const bufs = []; let first = null;
+      for await (const wb of sink.buffers(a, b)) { if (first === null) first = wb.timestamp; bufs.push(wb.buffer); }
+      if (!bufs.length) { const n = Math.round((t1 - t0) * rate); return { L: new Float32Array(n), R: new Float32Array(n) }; }
+      let tot = 0; for (const x of bufs) tot += x.length;
+      const L = new Float32Array(tot), R = new Float32Array(tot); let o = 0;
+      for (const x of bufs) { const c0 = x.getChannelData(0), c1 = x.numberOfChannels > 1 ? x.getChannelData(1) : c0; L.set(c0, o); R.set(c1, o); o += x.length; }
+      return sliceAndResample(L, R, bufs[0].sampleRate, first, t0, t1, rate);
+    }
+  };
+}
+// Fallback: decodes the whole file at once (memory-limited), still read in pieces.
+async function fullReader(file) {
+  const buf = await decode(file), sr = buf.sampleRate;
+  const c0 = buf.getChannelData(0), c1 = buf.numberOfChannels > 1 ? buf.getChannelData(1) : c0;
+  return {
+    kind: 'full', duration: buf.duration,
+    async read(t0, t1, rate) {
+      const m = 0.25, i0 = Math.max(0, Math.round((t0 - m) * sr)), i1 = Math.min(c0.length, Math.round((t1 + m) * sr));
+      return sliceAndResample(c0.subarray(i0, i1), c1.subarray(i0, i1), sr, i0 / sr, t0, t1, rate);
+    }
+  };
+}
+async function openReader(file) {
+  try {
+    const rd = await streamReader(file);
+    const t = await rd.read(0, Math.min(1, rd.duration), 16000);   // sanity check that decoding really works
+    if (!t.L.length) throw new Error('empty decode');
+    return rd;
+  } catch (e) {
+    console.warn('Streaming decoder unavailable, using whole-file decode:', e);
+    setStatus('Streaming decoder unavailable for this file. Using whole-file decoding, so very long files may run out of memory.');
+    return fullReader(file);
+  }
+}
+
+async function makeSink(ext, N, SR, name) {
+  let w = null; const parts = [];
+  if (outDir) w = await (await outDir.getFileHandle(name, { create: true })).createWritable();
+  const put = async u8 => { if (w) await w.write(u8); else parts.push(u8); };
+  if (ext === 'wav') await put(wavHeader(N, SR));
+  const enc = ext === 'mp3' ? new lamejs.Mp3Encoder(2, SR, 192) : null;
+  return {
+    async write(L, R) {
+      if (ext === 'wav') {
+        const b = new Int16Array(L.length * 2);
+        for (let i = 0; i < L.length; i++) { b[2 * i] = i16(L[i]); b[2 * i + 1] = i16(R[i]); }
+        await put(new Uint8Array(b.buffer));
+      } else {
+        const BLK = 1152, l = new Int16Array(BLK), r = new Int16Array(BLK);
+        for (let i = 0; i < L.length; i += BLK) {
+          const m = Math.min(BLK, L.length - i);
+          for (let k = 0; k < m; k++) { l[k] = i16(L[i + k]); r[k] = i16(R[i + k]); }
+          const out = enc.encodeBuffer(m === BLK ? l : l.subarray(0, m), m === BLK ? r : r.subarray(0, m));
+          if (out.length) await put(new Uint8Array(out));
+        }
+      }
+    },
+    async close() {
+      if (enc) { const end = enc.flush(); if (end.length) await put(new Uint8Array(end)); }
+      if (w) { await w.close(); return null; }
+      return new Blob(parts, { type: ext === 'wav' ? 'audio/wav' : 'audio/mpeg' });
+    }
+  };
+}
+
+/* ---------- state ---------- */
+let files = [], cur = -1, mode = 'beep', clipFile = null, outDir = null, wl = { exact: new Set(), pre: [] };
+const audio = new Audio(); let stopAt = null;
+const norm = w => w.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+const LEET = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b' };
+// canonical spelling: squashes repeated letters and common sound-alike spellings, applied to both the word list and the heard word
+const canon = w => w.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/c/g, 'k').replace(/y/g, 'i').replace(/z/g, 's').replace(/(.)\1+/g, '$1');
+function compile(list) {
+  wl = { exact: new Set(), pre: [], cExact: new Set(), cPre: [], maskEx: [], maskPre: [] };
+  for (const x of list) {
+    const t = x.trim().toLowerCase(); if (!t) continue;
+    if (t.endsWith('*')) { const p = t.slice(0, -1); wl.pre.push(p); if (p) { wl.cPre.push(canon(norm(p))); if (p.length >= 4) wl.maskPre.push(p); } }
+    else { wl.exact.add(t); wl.cExact.add(canon(norm(t))); if (t.length >= 3) wl.maskEx.push(t); }
+  }
+}
+// masked words such as f***, sh*t, a$$hole: symbols stand for any letter
+function maskedBad(w) {
+  const m = w.toLowerCase().replace(/[^\p{L}\p{N}*#@$%_]/gu, '');
+  if (m.length < 3 || !/[*#@$%_]/.test(m) || !/\p{L}/u.test(m)) return false;
+  const ok = (t, longer) => (longer ? m.length >= t.length : m.length === t.length) && [...t].every((ch, i) => /[*#@$%_]/.test(m[i]) || m[i] === ch);
+  return wl.maskEx.some(t => ok(t, false)) || wl.maskPre.some(t => ok(t, true));
+}
+function isBad(w) {
+  let n = norm(w.replace(/['’]s$/i, '')); if (!n) return maskedBad(w);
+  if (wl.exact.has(n) || wl.pre.some(p => n.startsWith(p))) return true;
+  if (/\p{L}/u.test(w) && /[0-9]/.test(w)) n = norm(w.toLowerCase().replace(/[0-8]/g, d => LEET[d] || d)); // sh1t, f0ck
+  const c = canon(n);
+  if (wl.cExact.has(c) || wl.cPre.some(p => p && c.startsWith(p))) return true;
+  return maskedBad(w);
+}
+const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const F = () => files[cur];
+compile(getWords());
+function rescan(f) { f.flags = new Set(); f.words.forEach((x, i) => { if (isBad(x.w)) f.flags.add(i); }); }
+
+/* ---------- add files + transcription queue ---------- */
+function updateDropVisibility() {
+  const has = files.length > 0;
+  $('#drop').classList.toggle('hide', has);
+  $('#wave').classList.toggle('hide', !has);
+}
+function addFiles(list) {
+  let added = 0;
+  for (const file of list) {
+    if (!/^audio\/|\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|amr|3gp|mp4|webm|mka|aif|aiff|caf)$/i.test(file.type || file.name) && !/\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|amr|3gp|mp4|webm|mka|aif|aiff|caf)$/i.test(file.name)) continue;
+    if (files.some(f => f.file.name === file.name && f.file.size === file.size)) continue;
+    files.push({ file, name: file.name, st: 'queued', flow: { step: 0, pct: 0, text: 'Waiting in line', hold: false, err: false } }); added++;
+  }
+  if (!added) { if (list.length) setStatus('That file is not audio. Choose an MP3, WAV, M4A, AAC, OGG or FLAC file.'); return; }
+  updateDropVisibility(); renderList();
+  if (cur < 0 && files.length) select(0);
+  runQueue();
+}
+$('#add').onclick = () => $('#picker').click();
+$('#picker').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('#drop').onclick = () => $('#picker').click();
+['dragenter', 'dragover'].forEach(ev => $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); }));
+['dragleave', 'dragend'].forEach(ev => $('#drop').addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.remove('over'); }));
+$('#drop').addEventListener('drop', e => { e.preventDefault(); $('#drop').classList.remove('over'); addFiles(e.dataTransfer.files); });
+
+
+// Clean-up used ONLY on the copy sent to the speech model. Export reads the original file, so exported audio is never touched.
+function prepForModel(x) {
+  const a = 0.962; let py = 0, px = 0, pk = 0;                 // high-pass (~100 Hz) removes rumble and bass thump
+  for (let i = 0; i < x.length; i++) { const v = x[i], y = a * (py + v - px); px = v; py = y; x[i] = y; const m = y < 0 ? -y : y; if (m > pk) pk = m; }
+  if (pk > 1e-4) { const g = Math.min(8, 0.9 / pk); if (g > 1.02) for (let i = 0; i < x.length; i++) x[i] *= g; }   // level the volume
+  return x;
+}
+// Joins two scans of the same audio. A flagged reading wins when both scans heard a word at the same moment.
+function mergeWords(A, B, onlyBad = false) {
+  const out = A.slice();
+  for (const b of B) {
+    const bl = Math.max(0.05, b.e - b.s); let hits = [];
+    for (let k = 0; k < out.length; k++) {
+      const a = out[k], ov = Math.min(a.e, b.e) - Math.max(a.s, b.s), al = Math.max(0.05, a.e - a.s);
+      if (ov > 0.4 * Math.min(al, bl)) hits.push(k);
+    }
+    if (!hits.length) { if (!onlyBad || isBad(b.w)) out.push(b); }
+    else if (isBad(b.w) && !hits.some(k => isBad(out[k].w))) out[hits[0]] = b;
+  }
+  return out.sort((x, y) => x.s - y.s);
+}
+// Voice-boost copy for an extra scan: keeps roughly 250-3400 Hz (where speech lives), then evens out the loudness so quiet lyrics rise above the beat.
+function vocalize(x) {
+  const dt = 1 / 16000, hp = (1 / (2 * Math.PI * 250)) / ((1 / (2 * Math.PI * 250)) + dt), lp = dt / ((1 / (2 * Math.PI * 3400)) + dt);
+  for (let pass = 0; pass < 2; pass++) {
+    let py = 0, px = 0;
+    for (let i = 0; i < x.length; i++) { const v = x[i], y = hp * (py + v - px); px = v; py = y; x[i] = y; }
+    let l = 0; for (let i = 0; i < x.length; i++) { l += lp * (x[i] - l); x[i] = l; }
+  }
+  let env = 1e-4;
+  for (let i = 0; i < x.length; i++) {
+    const v = x[i], q = v * v; env += (q > env ? 0.002 : 0.00008) * (q - env);
+    const g = Math.min(6, 0.12 / Math.sqrt(env + 1e-8)), y = v * g;
+    x[i] = y > 1 ? 1 : y < -1 ? -1 : y;
+  }
+  return x;
+}
+const SHIFT = 15;   // seconds: second scan starts mid-chunk so chunk edges fall somewhere else
+async function analyze(f) {
+  setStatus(`Reading ${f.name}...`); setFlow(f, 0, 0, 'Reading ' + f.name);
+  const rd = await openReader(f.file), dur = rd.duration, note = rd.kind === 'full' ? ' (streaming unavailable, decoding the whole file: very long files may run out of memory)' : '';
+  const RATE = 16000, B = 1400, step = Math.max(1, Math.floor(dur * RATE / B)), peaks = new Array(B).fill(0);
+  const CH = 300, OV = 4, parts = Math.max(1, Math.ceil(dur / CH)), words = [];
+  const WIN = 10, nW = Math.max(1, Math.ceil(dur / WIN)), sq = new Float64Array(nW), ns = new Float64Array(nW);   // loudness per 10 s, used to spot stretches the model went quiet on
+  for (let i = 0; i < parts; i++) {
+    const a = i * CH, own1 = Math.min(dur, a + CH), r0 = Math.max(0, a - OV), r1 = Math.min(dur, own1 + OV);
+    setStatus(`Reading ${f.name} (part ${i + 1} of ${parts})...${note}`); setFlow(f, 0, i / parts, `Reading part ${i + 1} of ${parts}`);
+    const { L, R } = await rd.read(r0, r1, RATE);
+    const mono = new Float32Array(L.length);
+    for (let k = 0; k < mono.length; k++) mono[k] = (L[k] + R[k]) / 2;
+    const k0 = Math.round((a - r0) * RATE), k1 = Math.min(mono.length, Math.round((own1 - r0) * RATE)), g0 = Math.round(a * RATE);
+    for (let k = k0; k < k1; k++) { const bin = Math.min(B - 1, Math.floor((g0 + k - k0) / step)), v = Math.abs(mono[k]); if (v > peaks[bin]) peaks[bin] = v; }
+    for (let k = k0; k < k1; k++) { const w = Math.min(nW - 1, Math.floor((a + (k - k0) / RATE) / WIN)); sq[w] += mono[k] * mono[k]; ns[w]++; }
+    if (mono.length < RATE / 2) continue;
+    setFlow(f, 1, i / parts, `Cleaning audio for the speech model (part ${i + 1} of ${parts})`);
+    prepForModel(mono);
+    const deep = $('#thorough') && $('#thorough').checked;
+    const TAG = /^[\(\[\*<].*[\)\]\*>]$/;                                     // "(music)", "[BLANK_AUDIO]", "*BEEP*" are not words
+    const keep = (c, off, lo, hi) => {
+      const txt = c.text.trim(); if (!txt || TAG.test(txt) || c.ts[0] == null) return null;
+      const s = c.ts[0] + r0 + off, e = (c.ts[1] ?? c.ts[0] + 0.4) + r0 + off;
+      return s >= Math.max(a - 1e-6, lo) && s < hi && (i === parts - 1 || s < own1) ? { w: txt, s, e } : null;
+    };
+    // Deep scan: the model skips lyrics when it listens in long 30 s windows over music, so also listen in short overlapping clips.
+    const fine = dur <= 600, CLIP = fine ? 5 : 8, HOP = fine ? 4 : 6, clips = [];   // short clips hear more; files over 10 minutes keep longer clips to save time
+    if (deep) {
+      for (let t0 = 0; t0 < mono.length / RATE - 1; t0 += HOP) {
+        const i0 = Math.round(t0 * RATE), i1 = Math.min(mono.length, Math.round((t0 + CLIP) * RATE)), last = i1 >= mono.length;
+        let ss = 0; for (let k = i0; k < i1; k++) ss += mono[k] * mono[k];
+        if (i1 - i0 >= RATE && Math.sqrt(ss / (i1 - i0)) > 0.004) clips.push({ t0, x: mono.slice(i0, i1), lo: t0 === 0 ? 0 : t0 + (CLIP - HOP) / 2, hi: last ? Infinity : t0 + CLIP - (CLIP - HOP) / 2 });
+        if (last) break;
+      }
+    }
+    const team = $('#model').value === 'team' && !useMain && !(navigator.deviceMemory && navigator.deviceMemory <= 2);   // low-memory devices stay on one model
+    const seq = team && IS_PHONE;                       // on a phone the three models take turns so only one sits in memory at a time
+    teamCap = team && !seq ? 3 : 0;
+    // each model gets its own copy of the audio, because handing audio to a worker gives its buffer away
+    const sets = (team ? TEAM : [modelId()]).map((m, k) => k === 0 ? { m, mono, clips, primary: true } : { m, mono: mono.slice(), clips: clips.map(c => ({ ...c, x: c.x.slice() })) });
+    const totalClips = sets.length * clips.length, lost = [], tStart = performance.now(); let doneClips = 0, failedClips = 0;
+    setStatus(`Transcribing ${f.name}: part ${i + 1} of ${parts}${clips.length ? ' (deep scan)' : ''}${team ? ' (team of 3 models)' : ''}...${note}`);
+    const tell = () => setFlow(f, 2, (i + (totalClips ? doneClips / totalClips : 0)) / parts, `Listening for foul words · part ${i + 1} of ${parts}${team ? ` · ${seq ? 'models take turns' : 'team of ' + (sets.length - lost.length) + ' models'}` : ''}${totalClips ? ` · short clips ${doneClips} of ${totalClips}` : ''}${(() => { if (doneClips < 3 || doneClips >= totalClips) return ''; const ms = (performance.now() - tStart) / doneClips * (totalClips - doneClips); return ms < 60000 ? ' · under a minute left' : ` · about ${Math.round(ms / 60000)} min left`; })()} · ${words.filter(x => isBad(x.w)).length} found so far${lost.length ? ` · ${lost.join(', ')} could not load, continuing without` : ''}`);
+    tell();
+    const scan = async set => {
+      const ctc = /wav2vec2/i.test(set.m), one = (x, off, lo, hi) => transcribe(x, set.m, $('#lang').value).then(cs => cs.map(k => keep(k, off, lo, hi)).filter(Boolean));
+      const tick = p => p.then(r => { doneClips++; tell(); return r; }, e => { doneClips++; tell(); throw e; });
+      const attempt = c => one(c.x.slice(), c.t0, c.lo, c.hi);                       // a copy is sent each time, so a failed clip can be tried again
+      const clipJobs = set.clips.map(c => () => tick(attempt(c).catch(() => attempt(c)).catch(() => { failedClips++; return []; })));
+      let mainJob = ctc ? null : () => one(set.mono, 0, -Infinity, Infinity), first = null;   // Wav2Vec2 only does short clips: long audio would use too much memory
+      if (!set.primary) {                                                             // a helper model gets one must-succeed job first; if it cannot load, the rest carry on without it
+        if (mainJob) { first = mainJob; mainJob = null; }
+        else if (set.clips.length) { const c0 = set.clips[0]; clipJobs.shift(); first = () => tick(attempt(c0)); }
+        else return [];
+      }
+      let firstRes = null;
+      if (first) { try { firstRes = await first(); } catch (e) { lost.push(TEAM_NAMES[set.m] || set.m); doneClips += set.clips.length - (ctc ? 1 : 0); tell(); return []; } }
+      const [mainRes, ...clipRes] = await Promise.all([mainJob ? mainJob() : null, ...clipJobs.map(fn => fn())]);
+      const mainWords = ctc ? [] : (set.primary ? mainRes : firstRes) || [];
+      const clipWords = [...(ctc && firstRes ? firstRes : []), ...clipRes.flat()].sort((x, y) => x.s - y.s);
+      return set.clips.length ? mergeWords(clipWords, mainWords) : mainWords;         // short clips lead; a flagged reading always wins where scans overlap
+    };
+    let outs = [];
+    if (seq) for (const set of sets) { if (set.primary || !lost.includes(TEAM_NAMES[set.m])) { setStatus(`Phone mode: ${TEAM_NAMES[set.m] || 'Whisper Base'} is listening, then the next model takes its turn...`); outs.push(await scan(set)); } }
+    else outs = await Promise.all(sets.map(scan));
+    let got = outs[0];
+    for (let k = 1; k < outs.length; k++) got = mergeWords(got, outs[k], /wav2vec2/i.test(sets[k].m));   // Wav2Vec2 only adds foul words (its raw text is rough)
+    words.push(...got);
+    setFlow(f, 2, (i + 1) / parts, `Listening for foul words · part ${i + 1} of ${parts} done · ${words.filter(x => isBad(x.w)).length} found so far${lost.length ? ` · ${lost.join(', ')} could not load, so the other models did the work` : ''}${totalClips ? ` · listened to ${totalClips - failedClips} of ${totalClips} short clips${failedClips ? ' (some could not be checked, use Re-scan here on quiet stretches)' : ''}` : ''}`);
+  }
+  const cnt = new Array(nW).fill(0); words.forEach(x => { cnt[Math.min(nW - 1, Math.floor(x.s / WIN))]++; });
+  const seen = cnt.filter(c => c > 0).sort((p, q) => p - q), med = seen.length ? seen[seen.length >> 1] : 0, quiet = [];
+  for (let w = 0; w < nW; w++) { const len = Math.min(WIN, dur - w * WIN), loud = Math.sqrt(sq[w] / Math.max(1, ns[w])); if (len >= 2 && loud > 0.012 && cnt[w] <= Math.floor(med * 0.3)) quiet.push([w * WIN, Math.min(dur, (w + 1) * WIN)]); }   // music playing but few words heard
+  setStatus('Done.');
+  return { words, peaks, quiet, duration: dur, url: URL.createObjectURL(f.file) };
+}
+
+let busy = false;
+async function runQueue() {
+  if (busy) return; busy = true;
+  let lock = null; try { lock = navigator.wakeLock ? await navigator.wakeLock.request('screen') : null; } catch (_) {}   // stops the phone sleeping mid-scan
+  for (const f of files) {
+    if (f.st !== 'queued') continue;
+    f.st = 'working'; renderList();
+    try { Object.assign(f, await analyze(f)); rescan(f); f.st = 'ready'; }
+    catch (e) { f.st = 'error'; f.err = e.message; setStatus('Error: ' + e.message); setFlow(f, (f.flow && f.flow.step) || 0, 0, 'Stopped: ' + e.message, { err: true }); }
+    renderList();
+    if (F() === f) select(cur);
+    if (f.st === 'ready') {
+      if (autoMode) { try { await exportFile(f); } catch (e) { setStatus('Export failed: ' + e.message); setFlow(f, 3, 0, 'Export stopped: ' + e.message, { err: true }); } }
+      else setFlow(f, 3, 0, `Found ${f.flags.size} foul word${f.flags.size === 1 ? '' : 's'} · review the red words, then press Export`, { hold: true });
+    }
+  }
+  busy = false;
+  try { if (lock) await lock.release(); } catch (_) {}
+}
+
+function renderList() {
+  const el = $('#files'); el.innerHTML = '';
+  files.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'f' + (i === cur ? ' sel' : '');
+    const info = f.st === 'ready' ? `${f.flags.size} word(s) flagged` : f.st === 'working' ? 'Transcribing...' : f.st === 'queued' ? 'Waiting...' : 'Failed';
+    d.className += ' st-' + f.st;
+    d.innerHTML = `<b></b><small>${info}</small>`; d.firstChild.textContent = f.name;
+    d.onclick = () => select(i); el.appendChild(d);
+  });
+}
+function select(i) {
+  cur = i; renderList(); const f = F();
+  audio.pause(); setPlayIcon(false);
+  if (f && f.st === 'ready') audio.src = f.url;
+  sel = null; showText(); draw(); renderFlow(); showRangeBox();
+}
+function showText() {
+  const f = F(), tx = $('#tx'); tx.innerHTML = '';
+  if (!f) return;
+  if (f.st !== 'ready') { tx.textContent = f.st === 'error' ? 'Could not process this file: ' + f.err : 'Transcribing... this can take a few minutes for long audio.'; $('#count').textContent = ''; return; }
+  f.words.forEach((x, i) => {
+    const s = document.createElement('span');
+    s.className = 'w' + (f.flags.has(i) ? ' bad' : ''); s.textContent = x.w + ' ';
+    s.onclick = () => { f.flags.has(i) ? f.flags.delete(i) : f.flags.add(i); s.classList.toggle('bad'); renderList(); draw(); count(); };
+    s.ondblclick = () => playRange(x.s - 0.5, x.e + 0.5);
+    tx.appendChild(s);
+  });
+  count();
+}
+const count = () => { const f = F(), r = f && f.ranges ? f.ranges.length : 0; $('#count').textContent = f && f.flags ? `${f.flags.size} flagged${r ? ` · ${r} range${r > 1 ? 's' : ''}` : ''}` : ''; };
+
+/* ---------- flow: shows every step from reading to the saved file ---------- */
+const STEPS = ['Reading', 'Cleaning audio', 'Finding foul words', 'Censoring', 'Saving', 'Done'], STEP_AT = [0, 5, 10, 65, 90, 100];
+let autoMode = true;
+$('#auto').onclick = () => { autoMode = !autoMode; $('#auto').classList.toggle('on', autoMode); };
+const TEAM = ['Xenova/whisper-base', 'Xenova/whisper-small', 'Xenova/wav2vec2-base-960h'], TEAM_NAMES = { 'Xenova/whisper-small': 'Whisper Small', 'Xenova/wav2vec2-base-960h': 'Wav2Vec2' };
+const modelId = () => { const v = $('#model').value; return v === 'auto' || v === 'team' ? 'Xenova/whisper-base' : v; };
+function setFlow(f, step, pct, text, opt = {}) {
+  f.flow = { step, pct: pct || 0, text: text || '', hold: !!opt.hold, err: !!opt.err };
+  if (F() === f) renderFlow();
+}
+function renderFlow() {
+  const f = F(), box = $('#flow');
+  if (!f || !f.flow) { box.classList.add('hide'); return; }
+  const fl = f.flow, fin = fl.step >= STEPS.length - 1 && !fl.err;
+  box.classList.remove('hide'); box.classList.toggle('err', fl.err);
+  $('#flowsteps').innerHTML = STEPS.map((n, i) => `<li class="${fin || i < fl.step ? 'done' : (i === fl.step && !fl.hold ? 'now' : '')}">${n}</li>`).join('');
+  const lo = STEP_AT[Math.min(fl.step, 5)], hi = STEP_AT[Math.min(fl.step + 1, 5)];
+  $('#flowbar i').style.width = (fin ? 100 : fl.hold ? STEP_AT[fl.step] : lo + (hi - lo) * Math.max(0, Math.min(1, fl.pct))) + '%';
+  $('#flowtxt').textContent = fl.text;
+}
+
+/* ---------- playback + waveform ---------- */
+const PLAY_ICON = '<svg class="ic" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M6 4l10 6-10 6V4z"/></svg>';
+const PAUSE_ICON = '<svg class="ic" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M6 4h3v12H6zM11 4h3v12h-3z"/></svg>';
+const setPlayIcon = playing => ($('#play').innerHTML = playing ? PAUSE_ICON : PLAY_ICON);
+function playRange(a, b) { audio.currentTime = Math.max(0, a); stopAt = b; audio.play(); setPlayIcon(true); }
+$('#play').onclick = () => { if (!F() || F().st !== 'ready') return; stopAt = null; if (audio.paused) { audio.play(); setPlayIcon(true); } else { audio.pause(); setPlayIcon(false); } };
+audio.ontimeupdate = () => {
+  if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; setPlayIcon(false); }
+  draw();
+};
+audio.onended = () => setPlayIcon(false);
+const cv = $('#wave');
+function draw() {
+  const f = F(), w = cv.clientWidth, h = cv.clientHeight, r = devicePixelRatio || 1;
+  cv.width = w * r; cv.height = h * r; const g = cv.getContext('2d'); g.scale(r, r); g.clearRect(0, 0, w, h);
+  if (!f || f.st !== 'ready') { $('#time').textContent = '0:00 / 0:00'; return; }
+  g.fillStyle = '#3ea6ff88';
+  f.peaks.forEach((p, i) => { const x = i / f.peaks.length * w, bh = Math.max(1, p * h * 0.95); g.fillRect(x, (h - bh) / 2, Math.max(1, w / f.peaks.length), bh); });
+  g.fillStyle = '#ffcf5acc'; (f.quiet || []).forEach(([a, b]) => g.fillRect(a / f.duration * w, h - 5, Math.max(2, (b - a) / f.duration * w), 5));   // yellow = few words heard here
+  g.fillStyle = '#ff4d5eaa';
+  f.flags.forEach(i => { const x = f.words[i]; g.fillRect(x.s / f.duration * w, 0, Math.max(3, (x.e - x.s) / f.duration * w), h); });
+  g.fillStyle = '#ff8a3d99'; (f.ranges || []).forEach(([a, b]) => g.fillRect(a / f.duration * w, 0, Math.max(3, (b - a) / f.duration * w), h));
+  if (sel) { g.fillStyle = 'rgba(255,255,255,.16)'; g.fillRect(sel[0] / f.duration * w, 0, Math.max(2, (sel[1] - sel[0]) / f.duration * w), h); g.strokeStyle = 'rgba(255,255,255,.55)'; g.strokeRect(sel[0] / f.duration * w, 0.5, Math.max(2, (sel[1] - sel[0]) / f.duration * w), h - 1); }
+  g.fillStyle = '#fff'; g.fillRect(audio.currentTime / f.duration * w, 0, 2, h);
+  $('#time').textContent = `${fmt(audio.currentTime)} / ${fmt(f.duration)}`;
+}
+let dragX = null, sel = null;
+const tAt = x => Math.max(0, Math.min(1, x / cv.clientWidth)) * F().duration;
+function showRangeBox() {
+  const f = F(), has = !!(f && sel);
+  $('#rangebox').classList.toggle('hide', !has);
+  if (has) $('#rangeadd').textContent = `Censor ${fmt(sel[0])} – ${fmt(sel[1])}`;
+  $('#rangeclear').classList.toggle('hide', !(f && f.ranges && f.ranges.length));
+  count();
+}
+cv.onpointerdown = e => { const f = F(); if (!f || f.st !== 'ready') return; dragX = e.offsetX; sel = null; try { cv.setPointerCapture(e.pointerId); } catch (_) {} };
+let dragRaf = 0;
+cv.onpointermove = e => { if (dragX == null) return; if (Math.abs(e.offsetX - dragX) > 6 || sel) { const a = tAt(dragX), b = tAt(e.offsetX); sel = [Math.min(a, b), Math.max(a, b)]; if (!dragRaf) dragRaf = requestAnimationFrame(() => { dragRaf = 0; draw(); }); } };   // one redraw per frame keeps dragging smooth
+cv.onpointerup = e => {
+  const f = F(); if (dragX == null || !f) { dragX = null; return; }
+  dragX = null;
+  if (sel && sel[1] - sel[0] > 0.15) { showRangeBox(); draw(); return; }
+  sel = null; audio.currentTime = e.offsetX / cv.clientWidth * f.duration; showRangeBox(); draw();
+};
+$('#rangeadd').onclick = () => { const f = F(); if (!f || !sel) return; (f.ranges = f.ranges || []).push([sel[0], sel[1]]); sel = null; showRangeBox(); draw(); renderList(); };
+$('#rangecancel').onclick = () => { sel = null; showRangeBox(); draw(); };
+/* ---------- re-scan one section with very short clips ---------- */
+async function rescanSection(f, a, b) {
+  const team = $('#model').value === 'team' && !useMain && !(navigator.deviceMemory && navigator.deviceMemory <= 2), seq = team && IS_PHONE;
+  const models = team ? TEAM : [modelId()]; teamCap = team && !seq ? 3 : 0;
+  setFlow(f, 2, 0, `Re-scanning ${fmt(a)} – ${fmt(b)}...`); setStatus(`Re-scanning ${fmt(a)} – ${fmt(b)}...`);
+  const rd = await openReader(f.file), q0 = Math.max(0, a - 0.5), q1 = Math.min(f.duration, b + 0.5);
+  const { L, R } = await rd.read(q0, q1, RATE), mono = new Float32Array(L.length);
+  for (let k = 0; k < mono.length; k++) mono[k] = (L[k] + R[k]) / 2;
+  prepForModel(mono);
+  const CL = 3, HP = 2.5, clips = [];
+  for (let t0 = 0; t0 < mono.length / RATE - 1; t0 += HP) {
+    const i0 = Math.round(t0 * RATE), i1 = Math.min(mono.length, Math.round((t0 + CL) * RATE)), last = i1 >= mono.length;
+    if (i1 - i0 >= RATE) clips.push({ t0, x: mono.slice(i0, i1), lo: t0 === 0 ? 0 : t0 + (CL - HP) / 2, hi: last ? Infinity : t0 + CL - (CL - HP) / 2 });
+    if (last) break;
+  }
+  const TAG = /^[\(\[\*<].*[\)\]\*>]$/;
+  const run = async m => (await Promise.all(clips.map(c => transcribe(c.x.slice(), m, $('#lang').value).then(cs => cs.map(k => {
+    const txt = k.text.trim(); if (!txt || TAG.test(txt) || k.ts[0] == null) return null;
+    const st = k.ts[0] + q0 + c.t0, en = (k.ts[1] ?? k.ts[0] + 0.4) + q0 + c.t0;
+    return st >= q0 + c.lo && st < q0 + c.hi && st >= a - 0.2 && st < b + 0.2 ? { w: txt, s: st, e: en } : null;
+  }).filter(Boolean)).catch(() => [])))).flat().sort((x, y) => x.s - y.s);
+  let outs = [];
+  if (seq) for (const m of models) outs.push(await run(m)); else outs = await Promise.all(models.map(run));
+  let found = outs[0] || [];
+  for (let k = 1; k < outs.length; k++) found = mergeWords(found, outs[k], /wav2vec2/i.test(models[k]));
+  const oldSet = new Set(f.words), flagged = new Set([...f.flags].map(i => f.words[i]));
+  f.words = mergeWords(f.words, found);
+  f.flags = new Set(); let added = 0;
+  f.words.forEach((w, i) => { if (flagged.has(w)) f.flags.add(i); else if (!oldSet.has(w) && isBad(w.w)) { f.flags.add(i); added++; } });   // your own flag choices stay as they were
+  f.quiet = (f.quiet || []).filter(([x, y]) => y <= a || x >= b);
+  if (F() === f) { showText(); draw(); count(); }
+  renderList();
+  setStatus(`Re-scan done: ${added} new foul word${added === 1 ? '' : 's'} found.`);
+  setFlow(f, 3, 0, `Re-scanned ${fmt(a)} – ${fmt(b)} · ${added} new foul word${added === 1 ? '' : 's'} found · press Export when ready`, { hold: true });
+}
+$('#rangescan').onclick = async () => {
+  const f = F(); if (!f || !sel) return;
+  if (busy) { setStatus('Wait for the current song to finish first.'); return; }
+  const [a, b] = sel; sel = null; showRangeBox(); draw(); busy = true;
+  try { await rescanSection(f, a, b); } catch (e) { setStatus('Re-scan failed: ' + e.message); setFlow(f, 2, 0, 'Re-scan stopped: ' + e.message, { err: true }); }
+  busy = false; runQueue();
+};
+
+$('#rangeclear').onclick = () => { const f = F(); if (f) f.ranges = []; showRangeBox(); draw(); renderList(); };
+addEventListener('resize', draw);
+
+/* ---------- mode, hi sound, output folder, word list ---------- */
+$('#gain').oninput = () => ($('#gainv').textContent = $('#gain').value + '%');
+function placeSegHl(btn) {
+  const hl = $('#segHl'); if (!btn || !hl) return;
+  hl.style.width = btn.offsetWidth + 'px'; hl.style.transform = `translateX(${btn.offsetLeft}px)`;
+}
+document.querySelectorAll('#modes button').forEach(b => (b.onclick = () => {
+  mode = b.dataset.m; document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x === b));
+  placeSegHl(b);
+}));
+placeSegHl($('#modes button.on'));
+addEventListener('resize', () => placeSegHl($('#modes button.on')));
+$('#clip').onclick = () => {
+  if (clipFile) { clipFile = null; $('#clip').textContent = 'Hi sound: high tone'; return; }
+  $('#clipPicker').click();
+};
+$('#clipPicker').onchange = e => {
+  const p = e.target.files[0]; e.target.value = '';
+  if (p) { clipFile = p; $('#clip').textContent = 'Hi sound: ' + p.name + ' (click to reset)'; }
+};
+$('#dir').onclick = async () => {
+  if (!window.showDirectoryPicker) { setStatus('Your browser can\'t pick an output folder, so files go to your downloads folder. Chrome or Edge can choose a folder.'); return; }
+  try { outDir = await showDirectoryPicker({ mode: 'readwrite' }); $('#dir').textContent = 'Output: ' + outDir.name; } catch (_) {}
+};
+$('#wl').onclick = () => { $('#wlt').value = getWords().join('\n'); $('#wlg').showModal(); };
+$('#wld').onclick = () => { const have = new Set($('#wlt').value.split('\n').map(x => x.trim().toLowerCase()).filter(Boolean)); const add = DEFAULT_WORDS.filter(w => !have.has(w.toLowerCase())); $('#wlt').value = ($('#wlt').value.trim() ? $('#wlt').value.trim() + '\n' : '') + add.join('\n'); };
+$('#wlc').onclick = () => $('#wlg').close();
+$('#wls').onclick = () => {
+  const list = $('#wlt').value.split('\n').map(x => x.trim()).filter(Boolean);
+  setWords(list); compile(list);
+  files.forEach(f => f.st === 'ready' && rescan(f));
+  $('#wlg').close(); renderList(); showText(); draw();
+};
+
+/* ---------- export ---------- */
+function outExt(f) {
+  const sel = $('#fmt').value; if (sel !== 'same') return sel;
+  const e = f.name.split('.').pop().toLowerCase();
+  return (e === 'wav' || e === 'flac') ? 'wav' : 'mp3';
+}
+/* ---------- saving: uses the host's download prompt when published as an artifact, plain download otherwise ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+async function zipOne(name, blob) {   // single-file "stored" zip, used when the host only allows certain file types
+  const data = new Uint8Array(await blob.arrayBuffer()), nm = new TextEncoder().encode(name), n = data.length;
+  let c = 0xFFFFFFFF; for (let i = 0; i < n; i++) c = CRC[(c ^ data[i]) & 255] ^ (c >>> 8); c = (c ^ 0xFFFFFFFF) >>> 0;
+  const lh = new DataView(new ArrayBuffer(30)), cd = new DataView(new ArrayBuffer(46)), ee = new DataView(new ArrayBuffer(22));
+  lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(12, 33, true);
+  lh.setUint32(14, c, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true); lh.setUint16(26, nm.length, true);
+  cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true); cd.setUint16(14, 33, true);
+  cd.setUint32(16, c, true); cd.setUint32(20, n, true); cd.setUint32(24, n, true); cd.setUint16(28, nm.length, true);
+  ee.setUint32(0, 0x06054b50, true); ee.setUint16(8, 1, true); ee.setUint16(10, 1, true);
+  ee.setUint32(12, 46 + nm.length, true); ee.setUint32(16, 30 + nm.length + n, true);
+  return new Blob([lh, nm, data, cd, nm, ee], { type: 'application/zip' });
+}
+async function saveOut(blob, name) {
+  let dl = null;
+  try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (_) {}
+  if (dl) {
+    try { await dl.save({ filename: name, data: blob }); return; }
+    catch (e) {
+      const code = e && e.code;
+      if (code === 'declined') throw new Error('Save cancelled');
+      if (code === 'rejected_extension') {
+        try { await dl.save({ filename: name.replace(/\.[^.]+$/, '') + '.zip', data: await zipOne(name, blob) }); return; }
+        catch (e2) { if (e2 && e2.code === 'declined') throw new Error('Save cancelled'); throw e2; }
+      }
+      // any other code: fall through to the plain download below
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+async function exportFile(f) {
+  const pad = (+$('#pad').value || 0) / 1000, gain = (+$('#gain').value || 0) / 100, ext = outExt(f), SR = 44100;
+  const name = `${f.name.replace(/\.[^.]+$/, '')}_clean.${ext}`;
+  setStatus(`Exporting ${name}...`); setFlow(f, 3, 0, `Censoring ${f.flags.size} foul word${f.flags.size === 1 ? '' : 's'}`);
+  const rd = await openReader(f.file), dur = rd.duration, N = Math.round(dur * SR), note = rd.kind === 'full' ? ' (streaming unavailable, decoding the whole file)' : '';
+  const segs = makeSegs([...f.flags].map(i => [f.words[i].s - pad, f.words[i].e + pad]).concat((f.ranges || []).map(([a, b]) => [a, b])), dur, SR, N);
+  let cl = null;
+  if (mode === 'hi' && clipFile) { const c = await resample(await decode(clipFile), 2, SR); cl = [c.getChannelData(0), c.getChannelData(1)]; }
+  const sink = await makeSink(ext, N, SR, name);
+  await runExport(rd, N, SR, segs, mode, cl, gain, sink, p => { setStatus(`Exporting ${name}... ${Math.round(p * 100)}%${note}`); setFlow(f, 3, p, `Censoring ${f.flags.size} foul word${f.flags.size === 1 ? '' : 's'} · ${Math.round(p * 100)}%`); });
+  const blob = await sink.close();
+  setFlow(f, 4, 0.5, `Saving ${name}`);
+  if (blob) {
+    await saveOut(blob, name);
+  }
+  setStatus(`Saved ${name}`); setFlow(f, 5, 1, `Done · ${f.flags.size} foul word${f.flags.size === 1 ? '' : 's'} censored · saved as ${name}`);
+  return name;
+}
+$('#exp').onclick = async () => {
+  const f = F(); if (!f || f.st !== 'ready') return;
+  try { await exportFile(f); } catch (e) { setStatus('Export failed: ' + e.message); }
+};
+$('#expAll').onclick = async () => {
+  let n = 0;
+  for (const f of files) if (f.st === 'ready') { try { await exportFile(f); n++; } catch (e) { setStatus(`Export failed (${f.name}): ${e.message}`); return; } }
+  if (n) setStatus(`Exported ${n} file(s).`);
+};
+/* ---------- sidebar bars: dance faster while audio plays ---------- */
+for (const ev of ['play', 'pause', 'ended']) audio.addEventListener(ev, () => document.body.classList.toggle('playing', !audio.paused && !audio.ended));
+</script>
+</body>
+</html>
