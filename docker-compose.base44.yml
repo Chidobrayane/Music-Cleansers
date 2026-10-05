@@ -1,0 +1,33 @@
+services:
+  web:
+    image: nginx:alpine
+    restart: on-failure
+    working_dir: /usr/share/nginx/html
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        cat > /etc/nginx/conf.d/default.conf <<'CONF'
+        server {
+          listen 80 default_server;
+          server_name _;
+          root /usr/share/nginx/html;
+          index index.html;
+          location / {
+            add_header Cache-Control "no-store" always;
+            try_files $$uri $$uri/ /index.html;
+          }
+        }
+        CONF
+        sed -i 's/^user .*/user root;/' /etc/nginx/nginx.conf
+        exec nginx -g 'daemon off;'
+    ports:
+      - "3000:80"
+    volumes:
+      - ./:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/index.html || (echo 'web: nginx not serving index.html' >&2; exit 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
